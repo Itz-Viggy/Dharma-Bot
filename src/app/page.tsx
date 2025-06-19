@@ -1,103 +1,66 @@
-import Image from "next/image";
+import { DailyVerse } from "../components/Daily Verse";
+import { ChatArea } from "../components/Chat";
+import { Sparkles, Heart } from "lucide-react";
 
-export default function Home() {
+const Index = () => {
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen bg-sacred">
+      {/* Header */}
+      <header className="py-8 px-6">
+        <div className="max-w-7xl mx-auto text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="p-2 rounded-full bg-sacred-200/50">
+              <Sparkles className="h-8 w-8 text-sacred-700" />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-gradient font-inter">
+              DharmaBot
+            </h1>
+          </div>
+          <p className="text-sacred-600 text-lg max-w-2xl mx-auto leading-relaxed">
+            Discover ancient wisdom for modern life through the timeless teachings of the Bhagavad Gita.
+            Find guidance, peace, and purpose in your spiritual journey.
+          </p>
+        </div>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      {/* Main Content */}
+      <main className="px-6 pb-16">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-3 gap-8">
+            
+            {/* Daily Verse - Left Column */}
+            <div className="lg:col-span-1 space-y-6">
+              <DailyVerse />
+              
+              {/* Additional Info Card */}
+              <div className="p-6 bg-white/60 backdrop-blur-sm rounded-2xl border border-sacred-200 shadow-sacred">
+                <div className="flex items-center gap-3 mb-4">
+                  <Heart className="h-5 w-5 text-red-400" />
+                  <h3 className="font-semibold text-sacred-800 font-inter">About DharmaBot</h3>
+                </div>
+                <p className="text-sacred-600 text-sm leading-relaxed">
+                  DharmaBot shares wisdom from the Bhagavad Gita to help you navigate life's challenges
+                  with ancient spiritual insights. Ask questions about duty, purpose, and the path to inner peace.
+                </p>
+              </div>
+            </div>
+
+            {/* Chat Area - Right Column */}
+            <div className="lg:col-span-2">
+              <ChatArea />
+            </div>
+          </div>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      {/* Footer */}
+      <footer className="py-8 px-6 text-center border-t border-sacred-200/50">
+        <p className="text-sacred-500 text-sm">
+          Built with reverence for the eternal teachings of the Bhagavad Gita
+        </p>
       </footer>
     </div>
   );
-}
+};
+
+export default Index;

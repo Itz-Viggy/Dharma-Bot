@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ChatMessage } from "./message";
