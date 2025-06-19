@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ChatMessage } from "./message";
@@ -95,13 +94,13 @@ export const ChatArea = () => {
           {isTyping && (
             <div className="flex gap-3 mb-4">
               <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-sacred-200 to-sacred-300 flex items-center justify-center">
-                <div className="w-2 h-2 bg-sacred-600 rounded-full animate-pulse" />
+                <div className="w-2 h-2 bg-[#b8864c] rounded-full animate-pulse" />
               </div>
-              <div className="bg-white border border-sacred-200 text-sacred-800 rounded-2xl px-4 py-3 shadow-sm">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-sacred-400 rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-sacred-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                  <div className="w-2 h-2 bg-sacred-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+              <div className="bg-white border border-sacred-200 rounded-2xl px-4 py-3 shadow-sm">
+                <div className="flex gap-1  ">
+                  <div className="w-2 h-2 bg-[#b8864c] rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-[#b8864c] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                  <div className="w-2 h-2 bg-[#b8864c] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                 </div>
               </div>
             </div>

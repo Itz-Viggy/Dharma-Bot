@@ -25,7 +25,7 @@ export const ChatMessage = ({ role, text, timestamp }: ChatMessageProps) => {
         "max-w-[70%] rounded-2xl px-4 py-3 shadow-sm",
         isBot 
           ? "bg-white border border-sacred-200 text-sacred-800" 
-          : "bg-gradient-to-br from-sacred-400 to-sacred-500 text-white"
+          : "bg-gradient-to-br from-sacred-400 to-sacred-500 text-[#b8864c]"
       )}>
         <p className="text-sm leading-relaxed whitespace-pre-wrap">{text}</p>
         {timestamp && (
