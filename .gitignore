@@ -152,3 +152,6 @@ celerybeat.pid
 .mypy_cache/
 .dmypy.json
 dmypy.json
+# Ignore all ChromaDB artifacts
+backend/chroma/
+
