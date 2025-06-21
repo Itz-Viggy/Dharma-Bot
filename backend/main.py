@@ -173,16 +173,16 @@ Answer:"""
                         answer = gen.strip()
                     
                     # Add debug info to response for troubleshooting
-                    if debug_info:
-                        answer += f"\n\n[Debug: {', '.join(debug_info)}]"
+                    ##if debug_info:
+                        ##answer += f"\n\n[Debug: {', '.join(debug_info)}]"
                     return {"answer": answer, "used_verses": True}
     except Exception as e:
         print(f"Mistral generation failed: {e}")
 
     # Fallback: return just the verses
     verses_text = "\n\n".join(f"{v['id']}: {v['translation']}" for v in verses)
-    debug_text = f" [Debug: {', '.join(debug_info)}]" if debug_info else ""
-    return {"answer": f"Here are relevant verses for your question:\n\n{verses_text}{debug_text}", "used_verses": True}
+    #debug_text = f" [Debug: {', '.join(debug_info)}]" if debug_info else ""
+    return {"answer": f"Here are relevant verses for your question:\n\n{verses_text}", "used_verses": True}
 
 # Health check endpoint
 @app.get("/health")
