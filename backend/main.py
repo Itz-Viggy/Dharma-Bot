@@ -54,13 +54,24 @@ def query_verses(query: Query):
     text = query.q.strip().lower()
 
     # 1) chapter/verse direct lookup
-    m = re.match(r'.*chapter\s+(\d+)\s+verse\s+(\d+).*', text)
+    m = re.search(r'chapter\s+(\d+)\s+verse\s+(\d+)', text, re.IGNORECASE)
     if m:
-        c,v = int(m.group(1)), int(m.group(2))
+        chap, verse = int(m.group(1)), int(m.group(2))
         for md in META:
-            if md["chapter"]==c and md["verse"]==v:
-                return {"answer": md["translation"], "used_verses": True}
-        return {"answer": "I couldn't find that verse.", "used_verses": True}
+            # support both naming conventions
+            chap_val = md.get("chapter") or md.get("chapter_number") or md.get("chapter_id")
+            verse_val = md.get("verse") or md.get("verse_number") or md.get("verse_order")
+
+            if chap_val == chap and verse_val == verse:
+                return {
+                    "answer": md.get("translation", md.get("text", "")),
+                    "used_verses": True
+                }
+
+        return {
+            "answer": f"Sorry, I couldn’t find chapter {chap} verse {verse}.",
+            "used_verses": True
+        }
 
     # 2) Try to get embeddings from HuggingFace
     hf_token = os.getenv("HF_API_TOKEN")
