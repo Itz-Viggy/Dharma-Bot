@@ -1,23 +1,19 @@
 {
     "version": 2,
-    "projects": [
+    "builds": [
       {
         "src": "frontend/package.json",
-        "use": "@vercel/next",
-        "config": { "zeroConfig": true }
+        "use": "@vercel/next"
       },
       {
-        "src": "backend/app/main.py",
-        "use": "@vercel/python",
-        "config": {
-          "maxLambdaSize": "50mb"
-        }
+        "src": "backend/main.py",
+        "use": "@vercel/python"
       }
     ],
     "routes": [
       {
         "src": "/api/(.*)",
-        "dest": "backend/app/main.py"
+        "dest": "backend/main.py"
       },
       {
         "src": "/(.*)",
