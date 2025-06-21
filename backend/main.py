@@ -173,8 +173,8 @@ Answer:"""
                         answer = gen.strip()
                     
                     # Add debug info to response for troubleshooting
-                    if debug_info:
-                        answer += f"\n\n[Debug: {', '.join(debug_info)}]"
+                    ##if debug_info:
+                        ##answer += f"\n\n[Debug: {', '.join(debug_info)}]"
                     return {"answer": answer, "used_verses": True}
     except Exception as e:
         print(f"Mistral generation failed: {e}")
