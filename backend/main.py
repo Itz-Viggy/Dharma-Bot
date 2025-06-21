@@ -2,14 +2,15 @@
 
 from dotenv import load_dotenv
 import os
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+import re
+import json
+import requests
 import chromadb
 from chromadb.errors import NotFoundError
 from sentence_transformers import SentenceTransformer
-import json
-import requests
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 # ── ENV VARS ───────────────────────────────────────────────────────────────────
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
@@ -37,8 +38,6 @@ for v in raw_verses:
         "word_meanings": v.get("word_meanings", "")
     })
 
-print("🔍 First raw verse object:", raw_verses[0])
-
 # ── 3) EMBEDDINGS ─────────────────────────────────────────────────────────────
 model = SentenceTransformer("all-MiniLM-L6-v2")
 embeddings = model.encode(docs, show_progress_bar=True)
@@ -52,10 +51,6 @@ except NotFoundError:
     pass
 collection = client.create_collection(name="gita")
 collection.add(ids=ids, documents=docs, metadatas=metadatas, embeddings=embeddings.tolist())
-
-print("📦 Collection count:", collection.count())
-print("🧠 Added document:", docs[0])
-print("🧾 Metadata sample:", metadatas[0])
 
 # ── 5) FASTAPI APP ───────────────────────────────────────────────────────────
 app = FastAPI()
@@ -76,55 +71,44 @@ def debug_collection():
 
 @app.post("/query")
 def query_verses(query: Query):
+    q_text = query.q.strip().lower()
 
-    # 1) Retrieve top-3 verses
+    # direct lookup if asking chapter & verse
+    m = re.match(r'.*chapter\s+(\d+)\s+verse\s+(\d+).*', q_text)
+    if m:
+        chap, verse = int(m.group(1)), int(m.group(2))
+        for v in raw_verses:
+            if (v.get("chapter_number") or v.get("chapter_id")) == chap and \
+               (v.get("verse_number") or v.get("verse_order")) == verse:
+                return {
+                    "answer": v.get("translation", v["text"]),
+                    "used_verses": True
+                }
+        return {"answer": "Sorry, I couldn’t find that verse in the Gita.", "used_verses": True}
+
+    # always do RAG with top 3 verses
     results = collection.query(
         query_texts=[query.q],
         n_results=3,
-        include=["documents", "metadatas", "distances"]
+        include=["metadatas"]
     )
-   # 2) Build RAG prompt
-    # metadatas is returned as a list of lists (one list per query)
     verses = results["metadatas"][0]
 
-    prompt_lines = [
-        f"User asked: {query.q}",
-        "",
-        "Here are relevant verses:"
-    ]
-    for md in verses:
-        prompt_lines.append(f"{md['id']}: {md['translation']}")
-    prompt_lines.extend([
-        "",
-        "Based on these, provide a helpful, concise answer:"
-    ])
-    prompt = "\n".join(prompt_lines)
+    prompt = (
+        "Below are three relevant Bhagavad Gita verses:\n\n" +
+        "\n".join(f"{md['id']}: {md['translation']}" for md in verses) +
+        f"\n\nQuestion: {query.q}\nAnswer concisely, using only the above verses as reference:"
+    )
 
-    # 3) Call Mistral 7B via Hugging Face
     hf_token = os.getenv("HF_API_TOKEN")
-    if not hf_token:
-        raise ValueError("HF_API_TOKEN environment variable is not set")
-
     resp = requests.post(
         "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3",
-        headers={
-            "Authorization": f"Bearer {hf_token}",
-            "Accept": "application/json",
-        },
-        json={
-            "inputs": prompt,
-            "parameters": {"max_new_tokens": 200, "temperature": 0.7}
-        },
+        headers={"Authorization": f"Bearer {hf_token}"},
+        json={"inputs": prompt, "parameters": {"max_new_tokens": 200, "temperature": 0.7}},
         timeout=30
     )
     resp.raise_for_status()
+    gen = resp.json()[0]
+    answer = gen.get("generated_text", "").strip()
 
-    # 4) Parse HF response as a list
-    generated_list = resp.json()
-    if not isinstance(generated_list, list) or not generated_list:
-        raise RuntimeError(f"Unexpected HF response: {generated_list}")
-    generated = generated_list[0]
-    answer = generated.get("generated_text", "")
-
-    # 5) Return the LLM answer
-    return {"answer": answer.strip()}
+    return {"answer": answer, "used_verses": True}
