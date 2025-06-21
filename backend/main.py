@@ -56,7 +56,8 @@ collection.add(ids=ids, documents=docs, metadatas=metadatas, embeddings=embeddin
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[ "https://dharma-bot.vercel.app",  # your production URL
+                    "http://localhost:3000"       ],    # your local Next.js dev
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
