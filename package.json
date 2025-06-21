@@ -9,8 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@chroma-core/default-embed": "^0.1.8",
     "@radix-ui/react-scroll-area": "^1.2.9",
     "@radix-ui/react-slot": "^1.2.3",
+    "chromadb": "^3.0.4",
     "class-variance-authority": "^0.7.1",
     "lucide-react": "^0.517.0",
     "next": "15.3.4",

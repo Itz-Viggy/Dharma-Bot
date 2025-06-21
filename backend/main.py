@@ -1,114 +1,193 @@
-# backend/main.py
-
-from dotenv import load_dotenv
-import os
-import re
-import json
-import requests
-import chromadb
-from chromadb.errors import NotFoundError
-from sentence_transformers import SentenceTransformer
+import os, re, json
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from mangum import Mangum
+import numpy as np
+import requests
 
-# ── ENV VARS ───────────────────────────────────────────────────────────────────
+# ─── Load env & data ────────────────────────────────────────────────
+from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-# ── 1) LOAD VERSES JSON ────────────────────────────────────────────────────────
-DATA_PATH = os.path.join(os.path.dirname(__file__), "../verse.json")
-with open(DATA_PATH, "r", encoding="utf-8") as f:
-    raw_verses = json.load(f)
+# load precomputed embeddings + metadata
+EMBS = np.load(os.path.join(os.path.dirname(__file__), "data/embeddings.npy"))
+with open(os.path.join(os.path.dirname(__file__), "data/metadata.json"), "r", encoding="utf-8") as f:
+    META = json.load(f)
 
-# ── 2) PREPARE LISTS FOR CHROMA ───────────────────────────────────────────────
-ids, docs, metadatas = [], [], []
-for v in raw_verses:
-    chap = v.get("chapter_number") or v.get("chapter_id")
-    verse = v.get("verse_number") or v.get("verse_order")
-    uid = f"{chap}.{verse}"
-    ids.append(uid)
-    docs.append(v.get("translation", v["text"]))
-    metadatas.append({
-        "id": uid,
-        "chapter": chap,
-        "verse": verse,
-        "text": v["text"],
-        "translation": v.get("translation", v["text"]),
-        "transliteration": v.get("transliteration", ""),
-        "word_meanings": v.get("word_meanings", "")
-    })
+# fast similarity search helper
+def top_k(q_emb: np.ndarray, k=3):
+    # cosine similarity:
+    norms = np.linalg.norm(EMBS, axis=1) * np.linalg.norm(q_emb)
+    sims = EMBS.dot(q_emb) / norms
+    idx = np.argsort(-sims)[:k]
+    return [META[i] for i in idx]
 
-# ── 3) EMBEDDINGS ─────────────────────────────────────────────────────────────
-model = SentenceTransformer("all-MiniLM-L6-v2")
-embeddings = model.encode(docs, show_progress_bar=True)
+# Alternative: Simple text-based similarity using keyword matching
+def simple_text_search(query_text: str, k=3):
+    """Fallback search using simple text matching"""
+    query_words = set(query_text.lower().split())
+    scores = []
+    
+    for i, meta in enumerate(META):
+        text = meta.get('translation', '').lower()
+        text_words = set(text.split())
+        
+        # Simple word overlap score
+        overlap = len(query_words.intersection(text_words))
+        score = overlap / max(len(query_words), 1)
+        scores.append((score, i))
+    
+    # Sort by score and return top k
+    scores.sort(reverse=True)
+    return [META[idx] for _, idx in scores[:k]]
 
-# ── 4) CHROMA DB SETUP ────────────────────────────────────────────────────────
-client = chromadb.Client()
-try:
-    client.get_collection("gita")
-    client.delete_collection("gita")
-except NotFoundError:
-    pass
-collection = client.create_collection(name="gita")
-collection.add(ids=ids, documents=docs, metadatas=metadatas, embeddings=embeddings.tolist())
-
-# ── 5) FASTAPI APP ───────────────────────────────────────────────────────────
+# ─── FastAPI setup ─────────────────────────────────────────────────
 app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(CORSMiddleware, allow_origins=["https://dharma-bot.vercel.app", "http://localhost:3000"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 class Query(BaseModel):
     q: str
 
-@app.get("/debug")
-def debug_collection():
-    return collection.get(include=["documents", "metadatas"])
-
 @app.post("/query")
 def query_verses(query: Query):
-    q_text = query.q.strip().lower()
+    text = query.q.strip().lower()
 
-    # direct lookup if asking chapter & verse
-    m = re.match(r'.*chapter\s+(\d+)\s+verse\s+(\d+).*', q_text)
+    # 1) chapter/verse direct lookup
+    m = re.search(r'chapter\s+(\d+)\s+verse\s+(\d+)', text, re.IGNORECASE)
     if m:
         chap, verse = int(m.group(1)), int(m.group(2))
-        for v in raw_verses:
-            if (v.get("chapter_number") or v.get("chapter_id")) == chap and \
-               (v.get("verse_number") or v.get("verse_order")) == verse:
+        for md in META:
+            # support both naming conventions
+            chap_val = md.get("chapter") or md.get("chapter_number") or md.get("chapter_id")
+            verse_val = md.get("verse") or md.get("verse_number") or md.get("verse_order")
+
+            if chap_val == chap and verse_val == verse:
                 return {
-                    "answer": v.get("translation", v["text"]),
+                    "answer": md.get("translation", md.get("text", "")),
                     "used_verses": True
                 }
-        return {"answer": "Sorry, I couldn’t find that verse in the Gita.", "used_verses": True}
 
-    # always do RAG with top 3 verses
-    results = collection.query(
-        query_texts=[query.q],
-        n_results=3,
-        include=["metadatas"]
-    )
-    verses = results["metadatas"][0]
+        return {
+            "answer": f"Sorry, I couldn’t find chapter {chap} verse {verse}.",
+            "used_verses": True
+        }
 
-    prompt = (
-        "Below are three relevant Bhagavad Gita verses:\n\n" +
-        "\n".join(f"{md['id']}: {md['translation']}" for md in verses) +
-        f"\n\nQuestion: {query.q}\nAnswer concisely, using only the above verses as reference:"
-    )
-
+    # 2) Try to get embeddings from HuggingFace
     hf_token = os.getenv("HF_API_TOKEN")
-    resp = requests.post(
-        "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3",
-        headers={"Authorization": f"Bearer {hf_token}"},
-        json={"inputs": prompt, "parameters": {"max_new_tokens": 200, "temperature": 0.7}},
-        timeout=30
-    )
-    resp.raise_for_status()
-    gen = resp.json()[0]
-    answer = gen.get("generated_text", "").strip()
+    verses = None
+    debug_info = []
+    
+    print(f"Starting embedding search for query: '{query.q}'")
+    
+    # Method 1: Try sentence-transformers/all-MiniLM-L6-v2 - FIXED URL
+    try:
+        print("Attempting sentence-transformers/all-MiniLM-L6-v2...")
+        
+        # FIXED: Correct URL format for HuggingFace Inference API
+        emb_resp = requests.post(
+            "https://router.huggingface.co/hf-inference/models/"
+            "sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction",
+            headers={
+                "Authorization": f"Bearer {hf_token}",
+                "Content-Type": "application/json"
+            },
+            json={"inputs": [ query.q ]},
+            timeout=30
+        )
 
-    return {"answer": answer, "used_verses": True}
+        print(f"Response status: {emb_resp.status_code}")
+        print(f"Response content: {emb_resp.text[:300]}...")
+        
+        if emb_resp.status_code == 200:
+            emb_data = emb_resp.json()
+            print(f"Response type: {type(emb_data)}")
+            
+            # Handle the embedding response format
+            if isinstance(emb_data, list) and len(emb_data) > 0:
+                # Sentence transformers return embeddings as nested arrays
+                q_emb = np.array(emb_data)
+                # If it's a 2D array (batch_size, embedding_dim), take the first row
+                if q_emb.ndim == 2:
+                    q_emb = q_emb[0]
+                
+                print(f"Successfully extracted embedding of shape: {q_emb.shape}")
+                verses = top_k(q_emb, k=3)
+                debug_info.append("Used sentence-transformers/all-MiniLM-L6-v2")
+        else:
+            print(f"Request failed: {emb_resp.status_code} - {emb_resp.text}")
+            debug_info.append(f"sentence-transformers failed: {emb_resp.status_code}")
+            
+    except Exception as e:
+        print(f"sentence-transformers method failed with exception: {e}")
+        debug_info.append(f"sentence-transformers exception: {str(e)}")
+
+    
+
+    
+
+    # Method 4: Fallback to simple text-based search
+    if verses is None:
+        print("Using fallback text-based search")
+        verses = simple_text_search(query.q, k=3)
+        debug_info.append("Used text-based fallback")
+
+    print(f"Debug info: {debug_info}")
+
+    # 3) Generate response using the found verses
+    if not verses:
+        return {"answer": "I couldn't find relevant verses for your query.", "used_verses": False}
+
+    # Create prompt for text generation
+    verses_context = "\n".join(f"Verse {v['id']}: {v['translation']}" for v in verses)
+    prompt = f"""Based on these Bhagavad Gita verses, please answer the question concisely:
+
+{verses_context}
+
+Question: {query.q}
+
+Answer:"""
+    
+    # 4) Try to call Mistral for final answer
+    try:
+        resp = requests.post(
+            "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3",
+            headers={"Authorization": f"Bearer {hf_token}"},
+            json={
+                "inputs": prompt, 
+                "parameters": {"max_new_tokens": 200, "temperature": 0.7}, 
+                "options": {"wait_for_model": True}
+            },
+            timeout=30
+        )
+
+        if resp.status_code == 200:
+            response_data = resp.json()
+            if isinstance(response_data, list) and len(response_data) > 0:
+                gen = response_data[0].get("generated_text", "")
+                if gen.strip():
+                    # Clean up the response by removing the prompt
+                    if "Answer:" in gen:
+                        answer = gen.split("Answer:")[-1].strip()
+                    else:
+                        answer = gen.strip()
+                    
+                    # Add debug info to response for troubleshooting
+                    if debug_info:
+                        answer += f"\n\n[Debug: {', '.join(debug_info)}]"
+                    return {"answer": answer, "used_verses": True}
+    except Exception as e:
+        print(f"Mistral generation failed: {e}")
+
+    # Fallback: return just the verses
+    verses_text = "\n\n".join(f"{v['id']}: {v['translation']}" for v in verses)
+    debug_text = f" [Debug: {', '.join(debug_info)}]" if debug_info else ""
+    return {"answer": f"Here are relevant verses for your question:\n\n{verses_text}{debug_text}", "used_verses": True}
+
+# Health check endpoint
+@app.get("/health")
+def health_check():
+    return {"status": "healthy", "embeddings_loaded": len(EMBS), "metadata_loaded": len(META)}
+
+# AWS Lambda handler
+handler = Mangum(app)

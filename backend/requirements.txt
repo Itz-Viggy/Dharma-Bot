@@ -1,0 +1,6 @@
+fastapi
+mangum
+python-dotenv
+requests
+sentence-transformers
+chromadb
