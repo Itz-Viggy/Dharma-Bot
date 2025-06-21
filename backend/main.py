@@ -11,6 +11,7 @@ from sentence_transformers import SentenceTransformer
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from mangum import Mangum  # ← adapter for AWS Lambda
 
 # ── ENV VARS ───────────────────────────────────────────────────────────────────
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
@@ -50,7 +51,12 @@ try:
 except NotFoundError:
     pass
 collection = client.create_collection(name="gita")
-collection.add(ids=ids, documents=docs, metadatas=metadatas, embeddings=embeddings.tolist())
+collection.add(
+    ids=ids,
+    documents=docs,
+    metadatas=metadatas,
+    embeddings=embeddings.tolist()
+)
 
 # ── 5) FASTAPI APP ───────────────────────────────────────────────────────────
 app = FastAPI()
@@ -104,7 +110,10 @@ def query_verses(query: Query):
     resp = requests.post(
         "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3",
         headers={"Authorization": f"Bearer {hf_token}"},
-        json={"inputs": prompt, "parameters": {"max_new_tokens": 200, "temperature": 0.7}},
+        json={
+            "inputs": prompt,
+            "parameters": {"max_new_tokens": 200, "temperature": 0.7}
+        },
         timeout=30
     )
     resp.raise_for_status()
@@ -112,3 +121,6 @@ def query_verses(query: Query):
     answer = gen.get("generated_text", "").strip()
 
     return {"answer": answer, "used_verses": True}
+
+# Wrap for Vercel's AWS Lambda-based serverless runtime
+handler = Mangum(app)
