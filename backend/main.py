@@ -44,7 +44,7 @@ def simple_text_search(query_text: str, k=3):
 
 # ─── FastAPI setup ─────────────────────────────────────────────────
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=["https://dharma-bot.vercel.app", "http://localhost:3000"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 class Query(BaseModel):
     q: str
@@ -111,75 +111,9 @@ def query_verses(query: Query):
         print(f"sentence-transformers method failed with exception: {e}")
         debug_info.append(f"sentence-transformers exception: {str(e)}")
 
-    # Method 2: Try paraphrase model as backup
-    if verses is None:
-        try:
-            print("Attempting paraphrase-MiniLM-L6-v2...")
-            
-            emb_resp = requests.post(
-                "https://api-inference.huggingface.co/models/sentence-transformers/paraphrase-MiniLM-L6-v2",
-                headers={
-                    "Authorization": f"Bearer {hf_token}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "inputs": query.q
-                },
-                timeout=30
-            )
-            
-            print(f"Paraphrase model response status: {emb_resp.status_code}")
-            
-            if emb_resp.status_code == 200:
-                emb_data = emb_resp.json()
-                if isinstance(emb_data, list) and len(emb_data) > 0:
-                    q_emb = np.array(emb_data)
-                    if q_emb.ndim == 2:
-                        q_emb = q_emb[0]
-                    print(f"Successfully extracted paraphrase embedding of shape: {q_emb.shape}")
-                    verses = top_k(q_emb, k=3)
-                    debug_info.append("Used paraphrase-MiniLM-L6-v2")
-            else:
-                debug_info.append(f"Paraphrase model failed: {emb_resp.status_code}")
-                
-        except Exception as e:
-            print(f"Paraphrase model failed: {e}")
-            debug_info.append(f"Paraphrase model exception: {str(e)}")
+    
 
-    # Method 3: Try a different model as backup
-    if verses is None:
-        try:
-            print("Attempting all-mpnet-base-v2...")
-            
-            emb_resp = requests.post(
-                "https://api-inference.huggingface.co/models/sentence-transformers/all-mpnet-base-v2",
-                headers={
-                    "Authorization": f"Bearer {hf_token}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "inputs": query.q
-                },
-                timeout=30
-            )
-            
-            print(f"MPNet model response status: {emb_resp.status_code}")
-            
-            if emb_resp.status_code == 200:
-                emb_data = emb_resp.json()
-                if isinstance(emb_data, list) and len(emb_data) > 0:
-                    q_emb = np.array(emb_data)
-                    if q_emb.ndim == 2:
-                        q_emb = q_emb[0]
-                    print(f"Successfully extracted MPNet embedding of shape: {q_emb.shape}")
-                    verses = top_k(q_emb, k=3)
-                    debug_info.append("Used all-mpnet-base-v2")
-            else:
-                debug_info.append(f"MPNet model failed: {emb_resp.status_code}")
-                
-        except Exception as e:
-            print(f"MPNet model failed: {e}")
-            debug_info.append(f"MPNet model exception: {str(e)}")
+    
 
     # Method 4: Fallback to simple text-based search
     if verses is None:
