@@ -62,7 +62,8 @@ export const ChatArea = () => {
     setIsTyping(true);
 
     try {
-      const res = await fetch("http://localhost:8000/query", {
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+      const res = await fetch(`${API_BASE}/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ q: text }),
