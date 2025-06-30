@@ -20,19 +20,6 @@ export const metadata: Metadata = {
     title: "DharmaBot - Ancient Wisdom for Modern Life",
     description: "Discover spiritual guidance through the timeless teachings of the Bhagavad Gita",
     type: "website",
-    images: [
-      {
-        url: "https://lovable.dev/opengraph-image-p98pqg.png",
-        width: 1200,
-        height: 630,
-        alt: "DharmaBot - Ancient Wisdom for Modern Life",
-      },
-    ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    site: "@lovable_dev",
-    images: ["https://lovable.dev/opengraph-image-p98pqg.png"],
   },
   icons: {
     icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕉️</text></svg>",
